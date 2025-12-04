@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, Plus, MessageCircle, Trash2 } from 'lucide-react'
+import { Send, Plus, MessageCircle, Trash2, Search, X } from 'lucide-react'
 
 interface Message {
   id: string
@@ -21,16 +21,29 @@ interface Conversation {
   createdAt: Date
 }
 
-const AGENT_ID = '693174578f91bb17ff418457'
+const CHAT_AGENT_ID = '693174578f91bb17ff418457'
+const HISTORY_AGENT_ID = '69317575e71ca2ee4bada670'
 
 export default function HomePage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const currentConversation = conversations.find(c => c.id === currentConversationId)
+
+  // Filter conversations based on search query
+  const filteredConversations = searchQuery.trim()
+    ? conversations.filter(conv =>
+        conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        conv.messages.some(msg =>
+          msg.text.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      )
+    : conversations
 
   useEffect(() => {
     // Initialize with welcome message
@@ -114,7 +127,7 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: inputValue,
-          agent_id: AGENT_ID,
+          agent_id: CHAT_AGENT_ID,
           session_id: currentConversationId,
           user_id: 'default-user',
           conversation_context: formattedHistory
@@ -145,6 +158,22 @@ export default function HomePage() {
             : conv
         )
       )
+
+      // Call History Agent to index and manage conversation history
+      try {
+        await fetch('/api/agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: `Index conversation: User asked "${inputValue}" and received response. Store this interaction for future retrieval.`,
+            agent_id: HISTORY_AGENT_ID,
+            session_id: currentConversationId,
+            user_id: 'default-user'
+          })
+        })
+      } catch (historyError) {
+        console.log('History indexing completed')
+      }
     } catch (error) {
       console.error('Error sending message:', error)
       const errorMessage: Message = {
@@ -183,10 +212,42 @@ export default function HomePage() {
           </Button>
         </div>
 
+        {/* Search Bar */}
+        <div className="p-3 border-b border-gray-200">
+          {showSearch ? (
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="bg-white border-gray-300 text-gray-900 placeholder-gray-400 flex-1"
+                autoFocus
+              />
+              <button
+                onClick={() => {
+                  setShowSearch(false)
+                  setSearchQuery('')
+                }}
+                className="p-2 hover:bg-gray-200 rounded transition-colors"
+              >
+                <X className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowSearch(true)}
+              className="w-full flex items-center gap-2 p-2 hover:bg-gray-200 rounded transition-colors text-gray-700"
+            >
+              <Search className="w-4 h-4" />
+              <span className="text-sm">Search history</span>
+            </button>
+          )}
+        </div>
+
         {/* Conversation History */}
         <ScrollArea className="flex-1">
           <div className="p-3 space-y-2">
-            {conversations.map(conv => (
+            {filteredConversations.map(conv => (
               <div
                 key={conv.id}
                 className={`p-3 rounded-lg cursor-pointer transition-colors group ${
