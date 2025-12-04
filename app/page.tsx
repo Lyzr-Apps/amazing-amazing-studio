@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, Plus, MessageCircle, Trash2, Search, X } from 'lucide-react'
+import { Send, Plus, MessageCircle, Trash2, Search, X, Settings } from 'lucide-react'
 
 interface Message {
   id: string
@@ -19,10 +19,53 @@ interface Conversation {
   title: string
   messages: Message[]
   createdAt: Date
+  agentMode: string
+}
+
+interface Agent {
+  id: string
+  name: string
+  label: string
+  description: string
+  icon: string
 }
 
 const CHAT_AGENT_ID = '693174578f91bb17ff418457'
 const HISTORY_AGENT_ID = '69317575e71ca2ee4bada670'
+const RESEARCH_AGENT_ID = '6931775c8f91bb17ff4187b6'
+const CREATIVE_AGENT_ID = '693177628f91bb17ff4187bb'
+const TECHNICAL_AGENT_ID = '693177678f91bb17ff4187c0'
+
+const AGENTS: Agent[] = [
+  {
+    id: CHAT_AGENT_ID,
+    name: 'Chat Assistant Agent',
+    label: 'Assistant',
+    description: 'General conversation and Q&A',
+    icon: 'MessageCircle'
+  },
+  {
+    id: RESEARCH_AGENT_ID,
+    name: 'Research Agent',
+    label: 'Research',
+    description: 'In-depth analysis and research',
+    icon: 'Search'
+  },
+  {
+    id: CREATIVE_AGENT_ID,
+    name: 'Creative Agent',
+    label: 'Creative',
+    description: 'Brainstorming and ideas',
+    icon: 'Lightbulb'
+  },
+  {
+    id: TECHNICAL_AGENT_ID,
+    name: 'Technical Agent',
+    label: 'Technical',
+    description: 'Code and technical help',
+    icon: 'Code'
+  }
+]
 
 export default function HomePage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -31,9 +74,12 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
+  const [selectedAgentId, setSelectedAgentId] = useState(CHAT_AGENT_ID)
+  const [showAgentSelector, setShowAgentSelector] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const currentConversation = conversations.find(c => c.id === currentConversationId)
+  const currentAgent = AGENTS.find(a => a.id === selectedAgentId) || AGENTS[0]
 
   // Filter conversations based on search query
   const filteredConversations = searchQuery.trim()
@@ -61,17 +107,25 @@ export default function HomePage() {
 
   function createNewConversation() {
     const newId = Date.now().toString()
+    const agent = AGENTS.find(a => a.id === selectedAgentId) || AGENTS[0]
+    const welcomeMessages: { [key: string]: string } = {
+      [CHAT_AGENT_ID]: "Hi! I'm your assistant. How can I help you today?",
+      [RESEARCH_AGENT_ID]: "Welcome to Research Mode. I'm here to help you dive deep into topics with detailed analysis and sources.",
+      [CREATIVE_AGENT_ID]: "Welcome to Creative Mode. Let's brainstorm and explore innovative ideas together!",
+      [TECHNICAL_AGENT_ID]: "Welcome to Technical Mode. I'm here to help with code, debugging, and system design questions."
+    }
     const welcomeMessage: Message = {
       id: '0',
-      text: "Hi! I'm your assistant. How can I help you today?",
+      text: welcomeMessages[selectedAgentId] || welcomeMessages[CHAT_AGENT_ID],
       sender: 'bot',
       timestamp: new Date()
     }
     const newConversation: Conversation = {
       id: newId,
-      title: 'New Conversation',
+      title: `${agent.label} Conversation`,
       messages: [welcomeMessage],
-      createdAt: new Date()
+      createdAt: new Date(),
+      agentMode: selectedAgentId
     }
     setConversations([newConversation, ...conversations])
     setCurrentConversationId(newId)
@@ -127,7 +181,7 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: inputValue,
-          agent_id: CHAT_AGENT_ID,
+          agent_id: selectedAgentId,
           session_id: currentConversationId,
           user_id: 'default-user',
           conversation_context: formattedHistory
@@ -292,9 +346,60 @@ export default function HomePage() {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <div className="border-b border-gray-200 p-4 bg-white">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {currentConversation?.title || 'Chat'}
-          </h2>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                {currentConversation?.title || 'Chat'}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Current Agent: {currentAgent.label}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAgentSelector(!showAgentSelector)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Switch agent"
+            >
+              <Settings className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+
+          {/* Agent Selector */}
+          {showAgentSelector && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <p className="text-sm font-medium text-gray-700 mb-3">Switch Agent:</p>
+              <div className="grid grid-cols-2 gap-2">
+                {AGENTS.map(agent => (
+                  <button
+                    key={agent.id}
+                    onClick={() => {
+                      setSelectedAgentId(agent.id)
+                      setShowAgentSelector(false)
+                    }}
+                    className={`p-3 rounded-lg text-left transition-all ${
+                      selectedAgentId === agent.id
+                        ? 'bg-blue-100 border-2 border-blue-500'
+                        : 'bg-gray-50 border-2 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <p className="font-medium text-sm text-gray-900">
+                      {agent.label}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {agent.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              <Button
+                onClick={() => createNewConversation()}
+                className="w-full mt-3 bg-blue-500 hover:bg-blue-600 text-white"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Start New Chat with {currentAgent.label}
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Messages Area */}
